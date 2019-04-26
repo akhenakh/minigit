@@ -7,10 +7,16 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"
+	"gopkg.in/src-d/go-git.v4/plumbing/transport/http"
+)
+
+var (
+	branch string
+	token  string
 )
 
 func main() {
-	var branch string
+
 	var cloneCmd = &cobra.Command{
 		Use:   "clone",
 		Short: "clone git repo",
@@ -22,8 +28,16 @@ func main() {
 			if len(args) > 1 {
 				directory = args[1]
 			}
+			var auth *http.BasicAuth
+			if token != "" {
+				auth = &http.BasicAuth{
+					Username: "minigit", // anything except an empty string
+					Password: token,
+				}
+			}
 			_, err := git.PlainClone(directory, false, &git.CloneOptions{
 				URL:               url,
+				Auth:              auth,
 				ReferenceName:     plumbing.ReferenceName("refs/heads/" + branch),
 				RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
 			})
@@ -55,7 +69,18 @@ func main() {
 				log.Fatal(err)
 			}
 
-			err = w.Pull(&git.PullOptions{RemoteName: remote, ReferenceName: plumbing.ReferenceName("refs/heads/" + branch)})
+			var auth *http.BasicAuth
+			if token != "" {
+				auth = &http.BasicAuth{
+					Username: "minigit", // anything except an empty string
+					Password: token,
+				}
+			}
+			err = w.Pull(&git.PullOptions{
+				Auth:          auth,
+				RemoteName:    remote,
+				ReferenceName: plumbing.ReferenceName("refs/heads/" + branch),
+			})
 			if err == git.NoErrAlreadyUpToDate {
 				return
 			}
@@ -68,6 +93,7 @@ func main() {
 	cloneCmd.Flags().StringVarP(&branch, "branch", "b", "master", "branch to clone")
 
 	var rootCmd = &cobra.Command{Use: "git"}
+	rootCmd.PersistentFlags().StringVar(&token, "ghtoken", "", "github access token")
 	rootCmd.AddCommand(cloneCmd)
 	rootCmd.AddCommand(pullCmd)
 	rootCmd.Execute()
